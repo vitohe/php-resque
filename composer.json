@@ -1,9 +1,9 @@
 {
-	"name": "chrisboulton/php-resque",
+	"name": "vitohe/php-resque",
 	"type": "library",
 	"description": "Redis backed library for creating background jobs and processing them later. Based on resque for Ruby.",
 	"keywords": ["job", "background", "redis", "resque"],
-	"homepage": "http://www.github.com/chrisboulton/php-resque/",
+	"homepage": "http://www.github.com/vitohe/php-resque/",
 	"license": "MIT",
 	"authors": [
 		{
