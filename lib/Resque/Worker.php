@@ -147,7 +147,7 @@ class Resque_Worker
 	 */
 	public function work($interval = Resque::DEFAULT_INTERVAL, $blocking = false)
 	{
-		$this->updateProcLine('Starting');
+		$this->updateProcLine('Starting...');
 		$this->startup();
 
 		while(true) {
@@ -182,7 +182,7 @@ class Resque_Worker
 						$this->updateProcLine('Paused');
 					}
 					else {
-						$this->updateProcLine('Waiting for ' . implode(',', $this->queues));
+						$this->updateProcLine('Waiting for job');
 					}
 
 					usleep($interval * 1000000);
@@ -326,7 +326,7 @@ class Resque_Worker
 	 */
 	private function updateProcLine($status)
 	{
-		$processTitle = 'resque-' . Resque::VERSION . ': ' . $status;
+		$processTitle = '[worker on ' . implode(',', $this->queues) . "] : " . $status;
 		if(function_exists('cli_set_process_title')) {
 			cli_set_process_title($processTitle);
 		}
