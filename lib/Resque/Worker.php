@@ -191,7 +191,7 @@ class Resque_Worker
 				continue;
 			}
 
-			$this->logger->log(Psr\Log\LogLevel::NOTICE, 'Starting work on {job}', array('job' => $job));
+			$this->logger->log(Psr\Log\LogLevel::NOTICE, 'Starting process on {job}', array('job' => $job));
 			Resque_Event::trigger('beforeFork', $job);
 			$this->workingOn($job);
 
@@ -238,6 +238,7 @@ class Resque_Worker
 	 */
 	public function perform(Resque_Job $job)
 	{
+        $time_start = microtime(true);
 		try {
 			Resque_Event::trigger('afterFork', $job);
 			$job->perform();
@@ -249,7 +250,9 @@ class Resque_Worker
 		}
 
 		$job->updateStatus(Resque_Job_Status::STATUS_COMPLETE);
-		$this->logger->log(Psr\Log\LogLevel::NOTICE, '{job} has finished', array('job' => $job));
+        $time_end = microtime(true);
+        $time = $time_end - $time_start;
+		$this->logger->log(Psr\Log\LogLevel::NOTICE, '{job} has finished, time cost: ' . $time, array('job' => $job));
 	}
 
 	/**

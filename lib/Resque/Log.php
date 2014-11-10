@@ -27,7 +27,7 @@ class Resque_Log extends Psr\Log\AbstractLogger
 		if ($this->verbose) {
 			fwrite(
 				STDOUT,
-				'[' . $level . '] [' . date('Y-m-d H:i:s') . '] ' . $this->interpolate($message, $context) . PHP_EOL
+				'[' . date('Y-m-d H:i:s') . ']'. ' [' . strtoupper($level) . ']: ' . $this->interpolate($message, $context) . PHP_EOL
 			);
 			return;
 		}
@@ -35,7 +35,7 @@ class Resque_Log extends Psr\Log\AbstractLogger
 		if (!($level === Psr\Log\LogLevel::INFO || $level === Psr\Log\LogLevel::DEBUG)) {
 			fwrite(
 				STDOUT,
-				'[' . $level . '] [' . date('Y-m-d H:i:s') . '] ' . $this->interpolate($message, $context) . PHP_EOL
+				'[' . date('Y-m-d H:i:s') . ']'. ' [' . strtoupper($level) . ']: ' . $this->interpolate($message, $context) . PHP_EOL
 			);
 		}
 	}
