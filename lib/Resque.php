@@ -144,6 +144,19 @@ class Resque
 	}
 
 	/**
+	 * Remove specified queue
+	 *
+	 * @param string $queue The name of the queue to remove.
+	 * @return integer Number of deleted items
+	 */
+	public static function removeQueue($queue)
+	{
+	    $num = self::removeList($queue);
+	    self::redis()->srem('queues', $queue);
+	    return $num;
+	}
+
+	/**
 	 * Pop an item off the end of the specified queues, using blocking list pop,
 	 * decode it and return it.
 	 *
@@ -197,21 +210,28 @@ class Resque
 	 * @param array $args Any optional arguments that should be passed when the job is executed.
 	 * @param boolean $trackStatus Set to true to be able to monitor the status of a job.
 	 *
-	 * @return string
+	 * @return string|boolean Job ID when the job was created, false if creation was cancelled due to beforeEnqueue
 	 */
 	public static function enqueue($queue, $class, $args = null, $trackStatus = false)
 	{
-		$result = Resque_Job::create($queue, $class, $args, $trackStatus);
-		if ($result) {
-			Resque_Event::trigger('afterEnqueue', array(
-				'class' => $class,
-				'args'  => $args,
-				'queue' => $queue,
-				'id'    => $result,
-			));
+		$id         = Resque::generateJobId();
+		$hookParams = array(
+			'class' => $class,
+			'args'  => $args,
+			'queue' => $queue,
+			'id'    => $id,
+		);
+		try {
+			Resque_Event::trigger('beforeEnqueue', $hookParams);
+		}
+		catch(Resque_Job_DontCreate $e) {
+			return false;
 		}
 
-		return $result;
+		Resque_Job::create($queue, $class, $args, $trackStatus, $id);
+		Resque_Event::trigger('afterEnqueue', $hookParams);
+
+		return $id;
 	}
 
 	/**
@@ -253,41 +273,42 @@ class Resque
 	 */
 	private static function removeItems($queue, $items = Array())
 	{
-	    $counter = 0;
-	    $originalQueue = 'queue:'. $queue;
-	    $tempQueue = $originalQueue. ':temp:'. time();
-	    $requeueQueue = $tempQueue. ':requeue';
-
-	    // move each item from original queue to temp queue and process it
-	    $finished = false;
-	    while(!$finished) {
-		$string = self::redis()->rpoplpush($originalQueue, self::redis()->getPrefix() . $tempQueue);
-
-		if(!empty($string)) {
-		    if(self::matchItem($string, $items)) {
-			$counter++;
-		    } else {
-			self::redis()->rpoplpush($tempQueue, self::redis()->getPrefix() . $requeueQueue);
-		    }
-		} else {
-		    $finished = true;
+		$counter = 0;
+		$originalQueue = 'queue:'. $queue;
+		$tempQueue = $originalQueue. ':temp:'. time();
+		$requeueQueue = $tempQueue. ':requeue';
+		
+		// move each item from original queue to temp queue and process it
+		$finished = false;
+		while (!$finished) {
+			$string = self::redis()->rpoplpush($originalQueue, self::redis()->getPrefix() . $tempQueue);
+	
+			if (!empty($string)) {
+				if(self::matchItem($string, $items)) {
+					self::redis()->rpop($tempQueue);
+					$counter++;
+				} else {
+					self::redis()->rpoplpush($tempQueue, self::redis()->getPrefix() . $requeueQueue);
+				}
+			} else {
+				$finished = true;
+			}
 		}
-	    }
 
-	    // move back from temp queue to original queue
-	    $finished = false;
-	    while(!$finished) {
-		$string = self::redis()->rpoplpush($requeueQueue, self::redis()->getPrefix() .$originalQueue);
-		if (empty($string)) {
-		    $finished = true;
+		// move back from temp queue to original queue
+		$finished = false;
+		while (!$finished) {
+			$string = self::redis()->rpoplpush($requeueQueue, self::redis()->getPrefix() .$originalQueue);
+			if (empty($string)) {
+			    $finished = true;
+			}
 		}
-	    }
 
-	    // remove temp queue and requeue queue
-	    self::redis()->del($requeueQueue);
-	    self::redis()->del($tempQueue);
-
-	    return $counter;
+		// remove temp queue and requeue queue
+		self::redis()->del($requeueQueue);
+		self::redis()->del($tempQueue);
+		
+		return $counter;
 	}
 
 	/**
@@ -340,6 +361,16 @@ class Resque
 	    $counter = self::size($queue);
 	    $result = self::redis()->del('queue:' . $queue);
 	    return ($result == 1) ? $counter : 0;
+	}
+
+	/*
+	 * Generate an identifier to attach to a job for status tracking.
+	 *
+	 * @return string
+	 */
+	public static function generateJobId()
+	{
+		return md5(uniqid('', true));
 	}
 }
 
